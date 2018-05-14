@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "sourceMap": true,
+    "pretty": true,
+    "strict": true,
+    "outFile": "dist/app.js",
+    "watch": true
+  },
+  "inclue": ["src/*"]
+}
