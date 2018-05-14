@@ -1,10 +1,12 @@
-const WIDTH = 500;
-const HEIGHT = 400;
-const CELL_SIZE = 20;
+const WIDTH = 600;
+const HEIGHT = 500;
+const CELL_SIZE = 10;
 
 // Calculated Constants
 const X_CELLS = WIDTH/CELL_SIZE;
 const Y_CELLS = HEIGHT/CELL_SIZE;
+
+let _intervalRef: any;
 
 enum Direction {
   Left,
@@ -17,7 +19,23 @@ enum CellType {
   SnakeHead,
   SnakeBody,
   SnakeTail,
-  Food
+  Food,
+  Collision
+}
+
+enum GameErrorType {
+  GameOver,
+  Fatal
+}
+
+class GameError extends Error {
+  kind: GameErrorType;
+
+  constructor(m: string, kind: GameErrorType) {
+    super(m);
+
+    this.kind = kind;
+  }
 }
 
 class Board {
@@ -49,26 +67,26 @@ class Board {
     }
   }
 
-  moveSnake(snake: Snake, direction: Direction): void {
+  updateSnake(snake: Snake, direction: Direction): GameError | null {
+    let error = snake.moveSnake(this, direction);
     // Set the pieces (We can do self collision here)
-    snake.body.forEach(piece => {
+    snake.body.forEach((piece, idx) => {
       let [piece_x, piece_y] = piece;
-      //if (this.grid[piece_x][piece_y] = CellType.Food) {
-        //switch (direction) {
-          //case Direction.Up:
-            //break;
-          //case Direction.Right:
-            //break;
-          //case Direction.Down:
-            //break;
-          //case Direction.Left:
-            //break;
-          //default:
-            //throw new Error('Invalid direction');
-        //}
-      //}
-      this.grid[piece_x][piece_y] = CellType.SnakeBody;
+      if (this.grid[piece_x][piece_y] === CellType.Food) {
+        snake.setOnMove(true);
+      }
+
+      if (error && idx === 0) {
+        this.grid[piece_x][piece_y] = CellType.Collision;
+      } else {
+        // Make sure we don't draw over collisions :)
+        if (this.grid[piece_x][piece_y] != CellType.Collision) {
+          this.grid[piece_x][piece_y] = CellType.SnakeBody;
+        }
+      }
     });
+
+    return error;
   }
 
   renderBoard(ctx: CanvasRenderingContext2D): void {
@@ -78,11 +96,14 @@ class Board {
       for (let i = 0; i < column.length; i++) {
         let cell = column[i];
         if (cell === CellType.SnakeBody) {
-          ctx.fillStyle = "#000000"
-          ctx.fillRect(j * 20, i * 20, 20, 20);
+          ctx.fillStyle = "#00FF00"
+          ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         } else if (cell === CellType.Food) {
+          ctx.fillStyle = "#FFA500"
+          ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        } else if (cell === CellType.Collision) {
           ctx.fillStyle = "#FF0000"
-          ctx.fillRect(j * 20, i * 20, 20, 20);
+          ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         }
       }
     }
@@ -104,16 +125,19 @@ class Board {
 
 class Snake {
   body: Array<[number, number]>;
+  growOnMove: boolean;
 
   constructor(snake: Array<[number, number]>) {
     this.body = snake;
+    this.growOnMove = false;
   }
 
   getHead(): [number, number] {
     return this.body[0];
   }
 
-  moveSnake(direction: Direction, board: Board): void {
+  moveSnake(board: Board, direction: Direction): GameError | null {
+    let error = null;
     let newPiece: [number, number];
     let [headX, headY] = this.getHead();
     switch (direction) {
@@ -149,13 +173,38 @@ class Snake {
         throw new Error('Invalid direction');
     }
 
-    this.body = [newPiece, ...this.body.splice(0, this.body.length - 1)];
+    let collision = false;
+    for (let i = 0; i < this.body.length; i++) {
+      let piece = this.body[i];
+      let [newX, newY] = newPiece;
+      let [checkX, checkY] = piece;
+      if (newX === checkX && newY === checkY) {
+        error = new GameError("Game Over - Classic", GameErrorType.GameOver);
+      }
+    }
+
+    if (this.growOnMove) {
+      this.body = [newPiece, ...this.body];
+      this.growOnMove = false;
+    } else {
+      this.body = [newPiece, ...this.body.splice(0, this.body.length - 1)];
+    }
+
+    return error;
+  }
+
+  setOnMove(shouldMove: boolean) {
+    this.growOnMove = shouldMove;
   }
 }
 
 window.onload = () => {
   const canvas: HTMLCanvasElement | null = document.getElementById("canvas") as HTMLCanvasElement | null;
   if (canvas == null) { throw new Error("Cannot find canvas element"); }
+  start(canvas);
+}
+
+function start(canvas: HTMLCanvasElement): void {
   canvas.width = WIDTH; // 25
   canvas.height = HEIGHT; // 20
 
@@ -164,10 +213,10 @@ window.onload = () => {
 
   // Create board
   let board = new Board(X_CELLS, Y_CELLS);
-  let direction = Direction.Down;
+  let direction = Direction.Right;
 
   // Create snake
-  let snake = new Snake([[2, 10], [2, 11], [2, 12]]);
+  let snake = new Snake([[3, 10], [2, 10], [1, 10]]);
 
   document.addEventListener('keypress', event => {
     const { keyCode } = event;
@@ -191,21 +240,36 @@ window.onload = () => {
     }
   });
 
-  // Game
-  setInterval(() => {
+  _intervalRef = setInterval(() => {
     // Delete
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     board.clear();
 
-    snake.moveSnake(direction, board);
-    board.moveSnake(snake, direction);
+    // Update the snake
+    let gameError = board.updateSnake(snake, direction);
+    if (gameError != null) {
+      // Draw one more tick for User Experience purposes
+      // TODO: Draw Collision?
+      if (gameError.kind == GameErrorType.GameOver) {
+        if (Math.random() < 0.1) {
+          board.addFruit(snake);
+        }
+        board.renderBoard(ctx);
+      }
+      alert("Game Over!");
+      STOP();
+    }
 
     if (Math.random() < 0.1) {
       board.addFruit(snake);
     }
     board.renderBoard(ctx);
     // Draw
-  }, 1000/4);
+  }, 1000/6);
 
 }
 
+
+function STOP() {
+  clearInterval(_intervalRef);
+}
