@@ -41,6 +41,7 @@ class Game {
   grid: number[][];
   snake: Snake;
   score: number;
+  private lastUsedDirection: Direction;
 
   constructor(width: number, height: number, snake: Snake) {
     const grid = new Array(width);
@@ -50,10 +51,12 @@ class Game {
     this.grid = grid;
     this.snake = snake;
     this.score = 0;
+    this.lastUsedDirection = snake.direction;
   }
 
   init(): void {
     this.addFruit();
+    document.addEventListener('keypress', this.directionListener.bind(this));
   }
 
   addFruit(): void {
@@ -76,11 +79,12 @@ class Game {
     }
   }
 
-  updateSnake(direction: Direction): GameError | null {
+  updateSnake(): GameError | null {
     const snake = this.snake;
+    this.lastUsedDirection = this.snake.direction;
 
     // Set the pieces (We can do self collision here)
-    let error = snake.moveSnake(direction);
+    let error = snake.moveSnake();
     snake.body.forEach((piece, idx) => {
       let [piece_x, piece_y] = piece;
       if (this.grid[piece_x][piece_y] === CellType.Food) {
@@ -134,26 +138,50 @@ class Game {
       }
     })
   }
+
+  private directionListener(event: any): void {
+    const { keyCode } = event;
+    switch (keyCode) {
+      case 37:
+        if (this.lastUsedDirection === Direction.Right) { break; }
+        this.snake.direction = Direction.Left;
+        break;
+      case 38:
+        if (this.lastUsedDirection === Direction.Down) { break; }
+        this.snake.direction = Direction.Up;
+        break;
+      case 39:
+        if (this.lastUsedDirection === Direction.Left) { break; }
+        this.snake.direction = Direction.Right;
+        break;
+      case 40:
+        if (this.lastUsedDirection === Direction.Up) { break; }
+        this.snake.direction = Direction.Down;
+        break;
+    }
+  }
 }
 
 class Snake {
   body: Array<[number, number]>;
   growOnMove: boolean;
+  direction: Direction;
 
   constructor(snake: Array<[number, number]>) {
     this.body = snake;
     this.growOnMove = false;
+    this.direction = Direction.Right;
   }
 
   getHead(): [number, number] {
     return this.body[0];
   }
 
-  moveSnake(direction: Direction): GameError | null {
+  moveSnake(): GameError | null {
     const [headX, headY] = this.getHead();
     let error = null;
     let newPiece: [number, number];
-    switch (direction) {
+    switch (this.direction) {
       case Direction.Up:
         let newHeadY = headY - 1;
         if (newHeadY < 0) {
@@ -229,36 +257,13 @@ function start(canvas: HTMLCanvasElement): void {
   let game = new Game(X_CELLS, Y_CELLS, snake);
   game.init();
 
-  let direction = Direction.Right;
-  document.addEventListener('keypress', event => {
-    const { keyCode } = event;
-    switch (keyCode) {
-      case 37:
-        if (direction === Direction.Right) { break; }
-        direction = Direction.Left;
-        break;
-      case 38:
-        if (direction === Direction.Down) { break; }
-        direction = Direction.Up;
-        break;
-      case 39:
-        if (direction === Direction.Left) { break; }
-        direction = Direction.Right;
-        break;
-      case 40:
-        if (direction === Direction.Up) { break; }
-        direction = Direction.Down;
-        break;
-    }
-  });
-
   _intervalRef = setInterval(() => {
     // Delete
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     game.clearGrid();
 
     // Update the snake
-    let gameError = game.updateSnake(direction);
+    let gameError = game.updateSnake();
     if (gameError != null) {
       // Draw one more tick for User Experience purposes
       if (gameError.kind == GameErrorType.GameOver) {
