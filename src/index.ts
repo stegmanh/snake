@@ -1,11 +1,10 @@
-const WIDTH = 600;
-const HEIGHT = 500;
-const CELL_SIZE = 10;
+const WIDTH = 510;
+const HEIGHT = 405;
+const CELL_SIZE = 15;
 
 // Calculated Constants
 const X_CELLS = WIDTH/CELL_SIZE;
 const Y_CELLS = HEIGHT/CELL_SIZE;
-
 let _intervalRef: any;
 
 enum Direction {
@@ -38,27 +37,37 @@ class GameError extends Error {
   }
 }
 
-class Board {
+class Game {
   grid: number[][];
+  snake: Snake;
+  score: number;
 
-  constructor(width: number, height: number) {
+  constructor(width: number, height: number, snake: Snake) {
     const grid = new Array(width);
     for (let i = 0; i < grid.length; i++) {
       grid[i] = new Array(height);
     }
     this.grid = grid;
+    this.snake = snake;
+    this.score = 0;
   }
 
-  addFruit(snake: Snake): void {
-    let x = Math.floor(Math.random() * X_CELLS);
-    let y = Math.floor(Math.random() * Y_CELLS);
+  init(): void {
+    this.addFruit();
+  }
+
+  addFruit(): void {
+    const snake = this.snake;
+    const x = Math.floor(Math.random() * X_CELLS);
+    const y = Math.floor(Math.random() * Y_CELLS);
 
     let collision = false;
     for (let i = 0; i < snake.body.length; i++) {
       let [piece_x, piece_y] = snake.body[i];
       if (piece_x === x && piece_y === y) {
+        console.warn('Fruit encountered a collision')
         collision = true;
-        // Keep trying?
+        this.addFruit();
       }
     }
 
@@ -67,13 +76,17 @@ class Board {
     }
   }
 
-  updateSnake(snake: Snake, direction: Direction): GameError | null {
-    let error = snake.moveSnake(this, direction);
+  updateSnake(direction: Direction): GameError | null {
+    const snake = this.snake;
+
     // Set the pieces (We can do self collision here)
+    let error = snake.moveSnake(direction);
     snake.body.forEach((piece, idx) => {
       let [piece_x, piece_y] = piece;
       if (this.grid[piece_x][piece_y] === CellType.Food) {
         snake.setOnMove(true);
+        this.score++;
+        this.addFruit();
       }
 
       if (error && idx === 0) {
@@ -89,7 +102,7 @@ class Board {
     return error;
   }
 
-  renderBoard(ctx: CanvasRenderingContext2D): void {
+  renderGrid(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = "#000000";
     for (let j = 0; j < this.grid.length; j++) {
       let column = this.grid[j];
@@ -109,7 +122,7 @@ class Board {
     }
   }
 
-  clear(): void {
+  clearGrid(): void {
     this.grid.forEach(column => {
       for (let i = 0; i < column.length; i++) {
         switch (column[i]) {
@@ -136,10 +149,10 @@ class Snake {
     return this.body[0];
   }
 
-  moveSnake(board: Board, direction: Direction): GameError | null {
+  moveSnake(direction: Direction): GameError | null {
+    const [headX, headY] = this.getHead();
     let error = null;
     let newPiece: [number, number];
-    let [headX, headY] = this.getHead();
     switch (direction) {
       case Direction.Up:
         let newHeadY = headY - 1;
@@ -212,12 +225,11 @@ function start(canvas: HTMLCanvasElement): void {
   if (ctx == null) { throw new Error("Null CTX") }
 
   // Create board
-  let board = new Board(X_CELLS, Y_CELLS);
-  let direction = Direction.Right;
-
-  // Create snake
   let snake = new Snake([[3, 10], [2, 10], [1, 10]]);
+  let game = new Game(X_CELLS, Y_CELLS, snake);
+  game.init();
 
+  let direction = Direction.Right;
   document.addEventListener('keypress', event => {
     const { keyCode } = event;
     switch (keyCode) {
@@ -243,27 +255,26 @@ function start(canvas: HTMLCanvasElement): void {
   _intervalRef = setInterval(() => {
     // Delete
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    board.clear();
+    game.clearGrid();
 
     // Update the snake
-    let gameError = board.updateSnake(snake, direction);
+    let gameError = game.updateSnake(direction);
     if (gameError != null) {
       // Draw one more tick for User Experience purposes
-      // TODO: Draw Collision?
       if (gameError.kind == GameErrorType.GameOver) {
         if (Math.random() < 0.1) {
-          board.addFruit(snake);
+          game.addFruit();
         }
-        board.renderBoard(ctx);
+        game.renderGrid(ctx);
       }
-      alert("Game Over!");
+      alert("Game Over!" + game.score);
       STOP();
     }
 
-    if (Math.random() < 0.1) {
-      board.addFruit(snake);
+    if (Math.random() < 0.001) {
+      game.addFruit();
     }
-    board.renderBoard(ctx);
+    game.renderGrid(ctx);
     // Draw
   }, 1000/6);
 
