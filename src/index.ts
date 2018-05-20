@@ -40,16 +40,20 @@ class GameError extends Error {
 class Game {
   grid: number[][];
   snake: Snake;
-  score: number;
+  private ctx: CanvasRenderingContext2D;
+  private score: number;
+  private scoreCallback?: (val: number) => void;
   private lastUsedDirection: Direction;
+  private intervalRef?: number; 
 
-  constructor(width: number, height: number, snake: Snake) {
+  constructor(width: number, height: number, snake: Snake, ctx: CanvasRenderingContext2D) {
     const grid = new Array(width);
     for (let i = 0; i < grid.length; i++) {
       grid[i] = new Array(height);
     }
     this.grid = grid;
     this.snake = snake;
+    this.ctx = ctx;
     this.score = 0;
     this.lastUsedDirection = snake.direction;
   }
@@ -57,6 +61,52 @@ class Game {
   init(): void {
     this.addFruit();
     document.addEventListener('keypress', this.directionListener.bind(this));
+  }
+
+  start(): void {
+    if (this.isPlaying()) {
+      console.warn('Game already started!');
+      return;
+    }
+    this.intervalRef = setInterval(() => {
+      // Delete
+      this.ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      this.clearGrid();
+
+      // Update the snake
+      let gameError = this.updateSnake();
+      if (gameError != null) {
+        // Draw one more tick for User Experience purposes
+        if (gameError.kind == GameErrorType.GameOver) {
+          if (Math.random() < 0.1) {
+            this.addFruit();
+          }
+          this.renderGrid(this.ctx);
+        }
+        alert("Game Over!" + this.getScore());
+        this.stop();
+      }
+
+      if (Math.random() < 0.001) {
+        this.addFruit();
+      }
+      this.renderGrid(this.ctx);
+      // Draw
+    }, 1000/6);
+
+  }
+
+  stop(): void {
+    if (!this.isPlaying()) {
+      console.warn('No game to stop');
+      return;
+    }
+
+    clearInterval(this.intervalRef);
+  }
+
+  isPlaying(): boolean {
+    return this.intervalRef !== undefined;
   }
 
   addFruit(): void {
@@ -137,6 +187,21 @@ class Game {
         }
       }
     })
+  }
+
+  getScore(): number {
+    return this.score;
+  }
+
+  setScore(value: number) {
+    this.score = value;
+    if (this.scoreCallback) {
+      this.scoreCallback(this.score);
+    }
+  }
+
+  addScoreListener(scoreCallback: (val: number) => void) {
+    this.scoreCallback = scoreCallback;
   }
 
   private directionListener(event: any): void {
@@ -239,12 +304,6 @@ class Snake {
   }
 }
 
-window.onload = () => {
-  const canvas: HTMLCanvasElement | null = document.getElementById("canvas") as HTMLCanvasElement | null;
-  if (canvas == null) { throw new Error("Cannot find canvas element"); }
-  start(canvas);
-}
-
 function start(canvas: HTMLCanvasElement): void {
   canvas.width = WIDTH; // 25
   canvas.height = HEIGHT; // 20
@@ -254,38 +313,9 @@ function start(canvas: HTMLCanvasElement): void {
 
   // Create board
   let snake = new Snake([[3, 10], [2, 10], [1, 10]]);
-  let game = new Game(X_CELLS, Y_CELLS, snake);
+  let game = new Game(X_CELLS, Y_CELLS, snake, ctx);
+
+  // Load and start game
   game.init();
-
-  _intervalRef = setInterval(() => {
-    // Delete
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    game.clearGrid();
-
-    // Update the snake
-    let gameError = game.updateSnake();
-    if (gameError != null) {
-      // Draw one more tick for User Experience purposes
-      if (gameError.kind == GameErrorType.GameOver) {
-        if (Math.random() < 0.1) {
-          game.addFruit();
-        }
-        game.renderGrid(ctx);
-      }
-      alert("Game Over!" + game.score);
-      STOP();
-    }
-
-    if (Math.random() < 0.001) {
-      game.addFruit();
-    }
-    game.renderGrid(ctx);
-    // Draw
-  }, 1000/6);
-
-}
-
-
-function STOP() {
-  clearInterval(_intervalRef);
+  game.start();
 }
