@@ -18,6 +18,9 @@ enum CellType {
   SnakeHead,
   SnakeBody,
   SnakeTail,
+  BombLow,
+  BombMedium,
+  BombHigh,
   Food,
   Collision
 }
@@ -59,7 +62,8 @@ class Game {
   }
 
   init(): void {
-    this.addFruit();
+    this.add(CellType.Food);
+    this.add(CellType.BombLow);
     document.addEventListener('keypress', this.directionListener.bind(this));
   }
 
@@ -78,9 +82,6 @@ class Game {
       if (gameError != null) {
         // Draw one more tick for User Experience purposes
         if (gameError.kind == GameErrorType.GameOver) {
-          if (Math.random() < 0.1) {
-            this.addFruit();
-          }
           this.renderGrid(this.ctx);
         }
         alert("Game Over!" + this.getScore());
@@ -88,7 +89,7 @@ class Game {
       }
 
       if (Math.random() < 0.001) {
-        this.addFruit();
+        this.add(CellType.Food);
       }
       this.renderGrid(this.ctx);
       // Draw
@@ -109,7 +110,7 @@ class Game {
     return this.intervalRef !== undefined;
   }
 
-  addFruit(): void {
+  add(cellType: CellType): void {
     const snake = this.snake;
     const x = Math.floor(Math.random() * X_CELLS);
     const y = Math.floor(Math.random() * Y_CELLS);
@@ -120,12 +121,12 @@ class Game {
       if (piece_x === x && piece_y === y) {
         console.warn('Fruit encountered a collision')
         collision = true;
-        this.addFruit();
+        this.add(cellType);
       }
     }
 
     if (!collision) {
-      this.grid[x][y] = CellType.Food;
+      this.grid[x][y] = cellType;
     }
   }
 
@@ -140,7 +141,7 @@ class Game {
       if (this.grid[piece_x][piece_y] === CellType.Food) {
         snake.setOnMove(true);
         this.score++;
-        this.addFruit();
+        this.add(CellType.Food);
       }
 
       if (error && idx === 0) {
@@ -168,6 +169,15 @@ class Game {
         } else if (cell === CellType.Food) {
           ctx.fillStyle = "#FFA500"
           ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        } else if (cell === CellType.BombLow) {
+          ctx.fillStyle = "#FFFF00"
+          ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        } else if (cell === CellType.BombMedium) {
+          ctx.fillStyle = "#A0A000"
+          ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        } else if (cell === CellType.BombHigh) {
+          ctx.fillStyle = "#A30000"
+          ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         } else if (cell === CellType.Collision) {
           ctx.fillStyle = "#FF0000"
           ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
@@ -179,11 +189,9 @@ class Game {
   clearGrid(): void {
     this.grid.forEach(column => {
       for (let i = 0; i < column.length; i++) {
-        switch (column[i]) {
-          case CellType.Food:
-            break;
-          default:
-            column[i] = 0;
+        let cellType = column[i];
+        if (cellType === CellType.SnakeBody || cellType === CellType.SnakeHead || cellType === CellType.SnakeTail) {
+          column[i] = 0;
         }
       }
     })
@@ -304,7 +312,7 @@ class Snake {
   }
 }
 
-function start(canvas: HTMLCanvasElement): void {
+function start(canvas: HTMLCanvasElement): Game {
   canvas.width = WIDTH; // 25
   canvas.height = HEIGHT; // 20
 
@@ -318,4 +326,6 @@ function start(canvas: HTMLCanvasElement): void {
   // Load and start game
   game.init();
   game.start();
+
+  return game;
 }
