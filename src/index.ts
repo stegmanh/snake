@@ -63,7 +63,6 @@ class Game {
 
   init(): void {
     this.add(CellType.Food);
-    this.add(CellType.BombLow);
     document.addEventListener('keypress', this.directionListener.bind(this));
   }
 
@@ -86,13 +85,12 @@ class Game {
         }
         alert("Game Over!" + this.getScore());
         this.stop();
+      } else {
+        if (Math.random() < 0.001) {
+          this.add(CellType.Food);
+        }
+        this.renderGrid(this.ctx);
       }
-
-      if (Math.random() < 0.001) {
-        this.add(CellType.Food);
-      }
-      this.renderGrid(this.ctx);
-      // Draw
     }, 1000/6);
 
   }
