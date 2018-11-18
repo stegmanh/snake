@@ -4354,7 +4354,7 @@ made of millions of bees!
 Pull forward. Nose down. Tail up.
 
   
-Rotate around it.
+Rotate around the flower.
 
   
 - This is insane, Barry!
