@@ -1,12 +1,11 @@
-package main
-
-import (
-  "fmt"
-)
-
-func main() {
-  fmt.Println(`
-According to all known laws
+{-# LANGUAGE QuasiQuotes #-}
+{-
+  Install deps: cabal install raw-strings-qq
+  $ ghc -o main Main.hs && ./main
+-}
+import Text.RawString.QQ
+script :: String
+script = [r|"According to all known laws
 of aviation,
 
   
@@ -4566,5 +4565,6 @@ during a production number!
 All right. Take ten, everybody.
 Wrap it up, guys.
 I had virtually no rehearsal for that.
-`);
-}
+|]
+
+main = putStrLn script
