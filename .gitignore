@@ -1,1 +1,5 @@
-dist/
+main
+Main
+*.dyn*
+*.hi
+*.o
